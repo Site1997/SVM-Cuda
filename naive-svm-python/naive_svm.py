@@ -10,10 +10,10 @@ Read data from csv
 df = pd.read_csv('iris.csv')
 df = df.drop(['Id'],axis=1)
 target = df['Species']
+print (df.shape)
 rows = list(range(100,150))
 # shape: (100, 5). (100 samples, 4 feature + 1 labels)
 df = df.drop(df.index[rows])
-print (df)
 
 df = df.drop(['SepalWidthCm','PetalWidthCm'], axis=1)
 # shape: (100, 3). (100 samples, 2 feature + 1 labels)
@@ -65,18 +65,30 @@ alpha = 0.0001
 while(epochs < 10000):
     y = w1 * train_f1 + w2 * train_f2
     prod = y * y_train
-    # print(epochs)
     count = 0
+    # My implementation
+    update1 = - (2 * 1/epochs * w1)
+    update2 = - (2 * 1/epochs * w2)
+    for val in prod:
+        if (val < 1):
+            update1 += train_f1[count] * y_train[count]
+            update2 += train_f2[count] * y_train[count]
+        count += 1
+    w1 = w1 + alpha * update1
+    w2 = w2 + alpha * update2
+    '''
+    # Two flaws in Author's implementation
+    # 1. regularization term should be counted only once in each epoch
+    # 2. w1, w2 should be update only once as well
     for val in prod:
         if(val >= 1):
-            cost = 0
             w1 = w1 - alpha * (2 * 1/epochs * w1)
             w2 = w2 - alpha * (2 * 1/epochs * w2)
         else:
-            cost = 1 - val 
             w1 = w1 + alpha * (train_f1[count] * y_train[count] - 2 * 1/epochs * w1)
             w2 = w2 + alpha * (train_f2[count] * y_train[count] - 2 * 1/epochs * w2)
         count += 1
+    '''
     epochs += 1
 
 
@@ -85,6 +97,7 @@ Testing Process
 '''
 ## Clip the weights 
 index = list(range(10,90))
+
 w1 = np.delete(w1,index)
 w2 = np.delete(w2,index)
 
