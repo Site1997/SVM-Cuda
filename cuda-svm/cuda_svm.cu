@@ -61,7 +61,7 @@ double determineAi(double* a,int* y,int i, int j, double aj_old) {
 
 // loss = regularization(a) + C * loss(a; x,y)
 // C ranges from 1e-5 ~ 1e5
-void cuda_svm(int objs,int coords,double** x,int* y,int c,int max_passes,double* a,double* b_out){
+void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,double* a,double* b_out){
     int b=0;
 
     int pass=0;
@@ -87,6 +87,13 @@ void cuda_svm(int objs,int coords,double** x,int* y,int c,int max_passes,double*
         cudaMemcpy(kval[0],kval_d,objs*objs*sizeof(double),cudaMemcpyDeviceToHost);
     }
 
+    // FILE* fk=fopen("custom.txt","w");
+    // for (int i=0;i<objs;i++){
+    //     double ei = calE(objs,a,b,y,kval,i);
+    //     fprintf(fk,"e[%d]=%f\n",i,ei);
+    // }
+    // fclose(fk);
+
     // for (int i=0;i<objs;++i)
     //   for (int j=0;j<objs;++j)
     //     printf("%.2f ",kval[i][j]);
@@ -94,7 +101,8 @@ void cuda_svm(int objs,int coords,double** x,int* y,int c,int max_passes,double*
     while (pass < max_passes) {
 		int num_changed_alphas = 0;
 		for (int i=0; i<objs; i++) {
-			double ei = calE(objs,a,b,y,kval,i);
+            double ei = calE(objs,a,b,y,kval,i);
+            // printf("e[%d]=%f\n",i,ei);
 			if ((y[i]*ei < -EPS && a[i] < c) || (y[i]*ei > EPS && a[i] > 0)) {
                 //updated rand method
                 int j = rand() % (objs-1);
@@ -125,7 +133,8 @@ void cuda_svm(int objs,int coords,double** x,int* y,int c,int max_passes,double*
                 }
 				num_changed_alphas ++;
 			}
-		}
+        }
+        // printf("changed: %d\n",num_changed_alphas);
 		if (num_changed_alphas == 0) pass ++;
 		else pass = 0;
     }

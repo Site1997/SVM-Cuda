@@ -14,6 +14,6 @@
         name[i] = name[i-1] + yDim;                         \
 } while (0)
 
-void cuda_svm(int objs,int coords,double** x,int* y,int c,int max_passes,double* a,double* b_out);
+void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,double* a,double* b_out);
 
 #endif

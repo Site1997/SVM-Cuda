@@ -7,7 +7,7 @@ double** x;
 int* y;
 double* a;
 double b=-1;
-const double TRAIN_RATIO = 0.9;
+const double TRAIN_RATIO = 0.5;
 
 void input() {
 	freopen("../data/in.txt", "r", stdin);
@@ -56,9 +56,9 @@ void eval() {
 int main(){
     input();
     cuda_svm(sampleNum*TRAIN_RATIO+1,xDim,x,y,0.1,1000,a,&b);
-    cout<<b;
-    for (int i=0;i<sampleNum;++i)
-      cout<<a[i]<<' ';
+    // cout<<b;
+    // for (int i=0;i<sampleNum;++i)
+    //   cout<<a[i]<<' ';
 	eval();
     return 0;
 }
