@@ -58,6 +58,7 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
     int b=0;
 
     int pass=0;
+    double init_clk=(double)clock()/CLOCKS_PER_SEC;
 
     double** kval;
     malloc2D(kval,objs,objs,double);
@@ -79,6 +80,7 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
         calc_linear_kernel<<<objs*objs/256+1,256>>>(objs,coords,x_r_d,kval_d);
         cudaMemcpy(kval[0],kval_d,objs*objs*sizeof(double),cudaMemcpyDeviceToHost);
     }
+    printf("Training.calcKrnel time=%lf s\n",(double)clock()/CLOCKS_PER_SEC-init_clk);
 
     // FILE* fk=fopen("custom.txt","w");
     // for (int i=0;i<objs;i++){
@@ -134,8 +136,9 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
 		if (num_changed_alphas == 0) pass ++;
         else pass = 0;
         double ed_clk=(double)clock()/CLOCKS_PER_SEC;
-        printf("iter %d,changed %d,runtime: %f\n",iter,num_changed_alphas,ed_clk-st_clk);
+        printf("%d,%d,%f\n",iter,num_changed_alphas,ed_clk-st_clk);
         ++iter;
     }
     *b_out=b;
+    printf("Training.total time=%lf s\n",(double)clock()/CLOCKS_PER_SEC-init_clk);
 }
