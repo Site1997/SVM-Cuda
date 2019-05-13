@@ -69,6 +69,8 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
 
     int pass=0;
 
+    double init_clk=(double)clock()/CLOCKS_PER_SEC;
+
     double** kval;
     malloc2D(kval,objs,objs,double);
     double* kval_d;
@@ -100,6 +102,7 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
         free(x_r);
         cudaFree(x_r_d);
     }
+    printf("Training.calcKrnel time=%lf s\n",(double)clock()/CLOCKS_PER_SEC-init_clk);
 
     // FILE* fk=fopen("custom.txt","w");
     // for (int i=0;i<objs;i++){
@@ -169,4 +172,5 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
         ++iter;
     }
     *b_out=b;
+    printf("Training.total time=%lf s\n",(double)clock()/CLOCKS_PER_SEC-init_clk);
 }
