@@ -34,11 +34,6 @@ void calc_e(int objs,double* a,double b,int* y,double* kval,double* e){
     }
 }
 
-__global__ static
-void update_e(int objs, double yi, double yj, double ai_old, double ai, double aj_old, double aj, double* kval, double* e){
-    int id=blockDim.x * blockIdx.x + threadIdx.x;
-}
-
 void calLH(double C,int yi, int yj, double ai, double aj, double &lb, double &rb)  {
 	if (yi != yj) {
 		lb = max(0., aj - ai);
