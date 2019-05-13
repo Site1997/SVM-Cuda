@@ -1,6 +1,5 @@
 #include "cuda_svm.h"
 // #include <cuda_runtime.h>
-#include <time.h>
 
 const double EPS = 0.0001;
 
@@ -21,17 +20,13 @@ void calc_linear_kernel(int objs,int coords,double* x,double* out){
     }
 }
 
-__global__ static
-void calc_e(int objs,double* a,double b,int* y,double* kval,double* e){
-    int id=blockDim.x * blockIdx.x + threadIdx.x;
-    if (id<objs){
-        double fx=b;
-        for (int i=0;i<objs;i++){
-            //access to a and y are not coalesced
-            fx+=a[i]*y[i]*kval[i*objs+id];
-        }
-        e[id]=fx-y[id];
-    }
+//calE is done within training, using kvals
+double calE(int objs,double* a,double b,int* y,double** kval,int target){
+    double fx = b;
+	for (int i=0; i<objs; i++) {
+		fx += a[i] * y[i] * kval[i][target];
+	}
+	return fx - y[target];
 }
 
 void calLH(double C,int yi, int yj, double ai, double aj, double &lb, double &rb)  {
@@ -56,12 +51,6 @@ double determineAi(double* a,int* y,int i, int j, double aj_old) {
 	return a[i] + y[i] * y[j] * (aj_old - a[j]);
 }
 
-void update_eVal(int objs,double b, double* a_d,int* y_d,double* kval_d,double* eVal_d,double* eVal){
-    //Might be costly to copy all of a since only a tiny part of a is updated
-    calc_e<<<objs/256+1,256>>>(objs,a_d,b,y_d,kval_d,eVal_d);
-    cudaMemcpy(eVal,eVal_d,sizeof(double)*objs,cudaMemcpyDeviceToHost);
-}
-
 // loss = regularization(a) + C * loss(a; x,y)
 // C ranges from 1e-5 ~ 1e5
 void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,double* a,double* b_out){
@@ -71,16 +60,6 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
 
     double** kval;
     malloc2D(kval,objs,objs,double);
-    double* kval_d;
-    cudaMalloc(&kval_d, objs*objs*sizeof(double));
-    double* a_d;
-    cudaMalloc(&a_d,objs*sizeof(double));
-    cudaMemcpy(a_d,a,objs*sizeof(double),cudaMemcpyHostToDevice);
-
-    //May possibly use Constant memory, if switched to byte*
-    int* y_d;
-    cudaMalloc(&y_d,objs*sizeof(int));
-    cudaMemcpy(y_d,y,objs*sizeof(int),cudaMemcpyHostToDevice);
 
     //Pre calculate kernel via cuda
     {
@@ -93,12 +72,11 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
         double* x_r_d;
         cudaMalloc(&x_r_d, coords*objs*sizeof(double));
         cudaMemcpy(x_r_d,x_r[0],coords*objs*sizeof(double),cudaMemcpyHostToDevice);
+        double* kval_d;
+        cudaMalloc(&kval_d, objs*objs*sizeof(double));
 
         calc_linear_kernel<<<objs*objs/256+1,256>>>(objs,coords,x_r_d,kval_d);
         cudaMemcpy(kval[0],kval_d,objs*objs*sizeof(double),cudaMemcpyDeviceToHost);
-
-        free(x_r);
-        cudaFree(x_r_d);
     }
 
     // FILE* fk=fopen("custom.txt","w");
@@ -112,26 +90,19 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
     //   for (int j=0;j<objs;++j)
     //     printf("%.2f ",kval[i][j]);
 
-    double* eVal=(double*)calloc(objs,sizeof(double));
-    double* eVal_d;
-    cudaMalloc(&eVal_d,objs*sizeof(double));
-
-    update_eVal(objs,b,a_d,y_d,kval_d,eVal_d,eVal);
-
     int iter=0;
     const int max_iter=50;
     while (pass < max_passes && iter < max_iter) {
-        double st_clk=(double)clock()/CLOCKS_PER_SEC;
 		int num_changed_alphas = 0;
 		for (int i=0; i<objs; i++) {
-            double ei = eVal[i];
+            double ei = calE(objs,a,b,y,kval,i);
             // printf("e[%d]=%f\n",i,ei);
 			if ((y[i]*ei < -EPS && a[i] < c) || (y[i]*ei > EPS && a[i] > 0)) {
                 //updated rand method
                 int j = rand() % (objs-1);
                 j=(j>=i)?j+1:j;
 
-				double ej = eVal[j];
+				double ej = calE(objs,a,b,y,kval,j);
 				double ai_old = a[i], aj_old = a[j];
 				double lb = 0, rb = c;
 				calLH(c,y[i], y[j], a[i], a[j], lb, rb);
@@ -154,19 +125,14 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
                     else finalB = (b1 + b2) / 2;
                     b=finalB;
                 }
-                num_changed_alphas ++;
-                //update only a_d[i] & a_d[j]
-                cudaMemcpy(a_d+i,a+i,sizeof(double),cudaMemcpyHostToDevice);
-                cudaMemcpy(a_d+j,a+j,sizeof(double),cudaMemcpyHostToDevice);
-                update_eVal(objs,b,a_d,y_d,kval_d,eVal_d,eVal);
+				num_changed_alphas ++;
 			}
         }
         // printf("changed: %d\n",num_changed_alphas);
 		if (num_changed_alphas == 0) pass ++;
         else pass = 0;
-        double ed_clk=(double)clock()/CLOCKS_PER_SEC;
-        printf("iter %d,changed %d,runtime: %f\n",iter,num_changed_alphas,ed_clk-st_clk);
         ++iter;
+        printf("iter %d\n",iter);
     }
     *b_out=b;
 }
