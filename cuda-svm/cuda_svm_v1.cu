@@ -165,7 +165,7 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
 		if (num_changed_alphas == 0) pass ++;
         else pass = 0;
         double ed_clk=(double)clock()/CLOCKS_PER_SEC;
-        printf("iter %d,changed %d,runtime: %f\n",iter,num_changed_alphas,ed_clk-st_clk);
+        printf("%d,%d,%f\n",iter,num_changed_alphas,ed_clk-st_clk);
         ++iter;
     }
     *b_out=b;
