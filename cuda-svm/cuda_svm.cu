@@ -34,6 +34,21 @@ void calc_e(int objs,double* a,double b,int* y,double* kval,double* e){
     }
 }
 
+// solid 13 arguments......
+__global__ static
+void update_e(int objs,double* e,double* kval,double b_old,double b_new,int i,int j,int yi,int yj,double ai_old,double ai_new,double aj_old,double aj_new){
+    int id=blockDim.x * blockIdx.x + threadIdx.x;
+    if (id<objs){
+        double val=e[id];
+        val+=(b_new-b_old);
+        double ti=yi*kval[i*objs+id];
+        double tj=yj*kval[j*objs+id];
+        val += ti*(ai_new-ai_old);
+        val += tj*(aj_new-aj_old);
+        e[id]=val;
+    }
+}
+
 void calLH(double C,int yi, int yj, double ai, double aj, double &lb, double &rb)  {
 	if (yi != yj) {
 		lb = max(0., aj - ai);
@@ -56,9 +71,15 @@ double determineAi(double* a,int* y,int i, int j, double aj_old) {
 	return a[i] + y[i] * y[j] * (aj_old - a[j]);
 }
 
-void update_eVal(int objs,double b, double* a_d,int* y_d,double* kval_d,double* eVal_d,double* eVal){
+void compute_eVal(int objs,double b, double* a_d,int* y_d,double* kval_d,double* eVal_d,double* eVal){
     //Might be costly to copy all of a since only a tiny part of a is updated
     calc_e<<<objs/256+1,256>>>(objs,a_d,b,y_d,kval_d,eVal_d);
+    cudaMemcpy(eVal,eVal_d,sizeof(double)*objs,cudaMemcpyDeviceToHost);
+}
+
+inline void update_eVal(int objs,double* eVal_d,double* kval_d,double b_old,double b_new,int i,int j,int yi,int yj,double ai_old,double ai_new,double aj_old,double aj_new,double* eVal){
+    //Might be costly to copy all of a since only a tiny part of a is updated
+    update_e<<<objs/256+1,256>>>(objs,eVal_d,kval_d,b_old,b_new,i,j,yi,yj,ai_old,ai_new,aj_old,aj_new);
     cudaMemcpy(eVal,eVal_d,sizeof(double)*objs,cudaMemcpyDeviceToHost);
 }
 
@@ -116,10 +137,10 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
     double* eVal_d;
     cudaMalloc(&eVal_d,objs*sizeof(double));
 
-    update_eVal(objs,b,a_d,y_d,kval_d,eVal_d,eVal);
+    compute_eVal(objs,b,a_d,y_d,kval_d,eVal_d,eVal);
 
     int iter=0;
-    const int max_iter=50;
+    const int max_iter=5000;
     while (pass < max_passes && iter < max_iter) {
         double st_clk=(double)clock()/CLOCKS_PER_SEC;
 		int num_changed_alphas = 0;
@@ -144,6 +165,7 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
 				if (abs(a[j] - aj_old) < 1e-5)
 					continue ;
                 a[i] = determineAi(a,y, i,j, aj_old);
+                double b_old=b;
                 //updateB inlined here for convenience
                 {
                     double b1 = b - ei - y[i]*(a[i]-ai_old)*kval[i][i] - y[j]*(a[j]-aj_old)*kval[i][j];
@@ -155,10 +177,7 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
                     b=finalB;
                 }
                 num_changed_alphas ++;
-                //update only a_d[i] & a_d[j]
-                cudaMemcpy(a_d+i,a+i,sizeof(double),cudaMemcpyHostToDevice);
-                cudaMemcpy(a_d+j,a+j,sizeof(double),cudaMemcpyHostToDevice);
-                update_eVal(objs,b,a_d,y_d,kval_d,eVal_d,eVal);
+                update_eVal(objs,eVal_d,kval_d,b_old,b,i,j,y[i],y[j],ai_old,a[i],aj_old,a[j],eVal);
 			}
         }
         // printf("changed: %d\n",num_changed_alphas);
@@ -170,3 +189,9 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
     }
     *b_out=b;
 }
+
+// void cuda_svm_predict(int objs,int coords,double** x,double* a,double b, int* y){
+//     double* kval_d;
+//     cudaMalloc(&kval_d, objs*objs*sizeof(double));
+    
+// }

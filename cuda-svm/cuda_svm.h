@@ -15,5 +15,6 @@
 } while (0)
 
 void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,double* a,double* b_out);
+void cuda_svm_predict(int objs,int coords,double** x,double* a,double b, int* y);
 
 #endif
