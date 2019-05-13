@@ -98,7 +98,9 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
     //   for (int j=0;j<objs;++j)
     //     printf("%.2f ",kval[i][j]);
 
-    while (pass < max_passes) {
+    int iter=0;
+    const int max_iter=50;
+    while (pass < max_passes && iter < max_iter) {
 		int num_changed_alphas = 0;
 		for (int i=0; i<objs; i++) {
             double ei = calE(objs,a,b,y,kval,i);
@@ -136,7 +138,9 @@ void cuda_svm(int objs,int coords,double** x,int* y,double c,int max_passes,doub
         }
         // printf("changed: %d\n",num_changed_alphas);
 		if (num_changed_alphas == 0) pass ++;
-		else pass = 0;
+        else pass = 0;
+        ++iter;
+        printf("iter %d\n",iter);
     }
     *b_out=b;
 }

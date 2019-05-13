@@ -7,7 +7,8 @@
 #include <algorithm>
 using namespace std;
 
-const int MAXN = 500;
+const int MAXN = 32768;
+const int MAXCOORD = 128;
 const int MAX_PASSES = 1000;
 const double TRAIN_RATIO = 0.5;
 const double EPS = 0.0001;
@@ -20,7 +21,7 @@ const double C = 0.1;
 // TRAIN_RATIO 0.9 Accuracy: 100%
 
 int sampleNum, xDim;
-double x[MAXN][MAXN]; int y[MAXN];
+double x[MAXN][MAXCOORD]; int y[MAXN];
 double a[MAXN], b;
 
 void init() {
@@ -32,7 +33,7 @@ void init() {
 }
 
 void input() {
-	freopen("../data/in.txt", "r", stdin);
+	freopen("../data/a9a_flat", "r", stdin);
 	scanf("%d%d", &sampleNum, &xDim);
 	for (int i=0; i<sampleNum; i++) {
 		for (int j=0; j<xDim; j++)
@@ -110,8 +111,12 @@ double updateB(int i, int j, double ei, double ej, double ai_old, double aj_old)
 void train() {
 	int pass = 0;
 	int m = sampleNum * TRAIN_RATIO + 1;
-	while (pass < MAX_PASSES) {
+	
+	int iter=0;
+    const int max_iter=50;
+	while (pass < MAX_PASSES && iter < max_iter) {
 		int num_changed_alphas = 0;
+		printf("iter %d\n",iter);
 		for (int i=0; i<m; i++) {
 			double ei = calE(m, x[i], y[i]);
 			if ((y[i]*ei < -EPS && a[i] < C) || (y[i]*ei > EPS && a[i] > 0)) {
@@ -135,6 +140,7 @@ void train() {
 		}
 		if (num_changed_alphas == 0) pass ++;
 		else pass = 0;
+		++iter;
 	}
 }
 

@@ -7,10 +7,10 @@ double** x;
 int* y;
 double* a;
 double b=-1;
-const double TRAIN_RATIO = 0.5;
+const double TRAIN_RATIO = 0.8;
 
 void input() {
-	freopen("../data/in.txt", "r", stdin);
+	freopen("../data/a9a_flat", "r", stdin);
 	scanf("%d%d", &sampleNum, &xDim);
     malloc2D(x,sampleNum,xDim,double);
     y=(int*)calloc(sampleNum,sizeof(double));
